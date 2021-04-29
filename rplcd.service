@@ -1,0 +1,13 @@
+[Unit]
+Description=Raspberry PI I2C LCD for Timeserver
+After=multi-user.target
+
+[Service]
+WorkingDirectory=/home/rplcd/rplcd_timeserver
+Type=simple
+Restart=always
+User=rplcd
+ExecStart=/usr/bin/python3 /home/rplcd/rplcd_timeserver/main.py
+
+[Install]
+WantedBy=multi-user.target
