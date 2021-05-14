@@ -1,7 +1,24 @@
+# -*- coding: utf-8 -*-
+#   Copyright 2021 Constantin Zaharia <constantin.zaharia@progeek.ro>
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+
 import subprocess
 import re
 import time
 from RPLCD.i2c import CharLCD
+
+__version__ = 1.0
 
 # Define digit pairs from 00 to 61 (yes 61 because of leap seconds)
 digits = [
@@ -19,20 +36,18 @@ digits = [
     [26260, 7171], [26260, 7371], [26041, 7101], [26261, 7371], [26241, 7141],
     [26241, 27351], [26020, 27120]]
 
-
 # TODO: Don't forget to add the rplcd user to i2c group
 class LCDScreen(object):
 
-    def __init__(self, welcome_text):
-        self.lcd = CharLCD(i2c_expander='PCF8574', address=0x27, port=1,
-                           cols=16, rows=2, dotsize=8,
+    def __init__(self, welcome_text, i2c_bus=1, i2c_addr=0x27, lcd_width=16, lcd_rows=2):
+
+        self.lcd = CharLCD(i2c_expander='PCF8574', address=i2c_addr, port=i2c_bus,
+                           cols=lcd_width, rows=lcd_rows, dotsize=8,
                            charmap='A02',
                            auto_linebreaks=True,
                            backlight_enabled=True)
 
-        self.lcd.backlight_enabled = True
-        self.lcd.clear()
-        self.lcd.write_string(welcome_text)
+        self._lcd_width = lcd_width
 
         # Create some custom characters
         self.lcd.create_char(0, (0, 0, 0, 0, 0, 0, 0, 0))
@@ -63,41 +78,48 @@ class LCDScreen(object):
         self.nrofscreens = len(self.screens)
         self.currentScreen = 0
 
-    def write_lcd(self, s):
+        self.lcd.backlight_enabled = True
+        self.lcd.clear()
+        self.print_line(welcome_text, 0, align='CENTER')
+        self.print_line(__version__, 1, align='CENTER')
+        self.lcd.home()
+
+    def print_line(self, text, line=0, align='LEFT'):
         """Checks the string, if different than last call, update screen.
 
-        :param s:
+        :param text:
+        :param line:
+        :param align:
         :return:
         """
 
-        if self.prevStr != s:  # Oh what a shitty way around actually learning the ins and outs of encoding chars...
+        if isinstance(text, float):
+            text = str(text)
+            
+        text = text.encode('utf-8')
+
+        if self.prevStr != text:  # Oh what a shitty way around actually learning the ins and outs of encoding chars...
             # Display string has changed, update LCD
-            self.lcd.clear()
-            self.lcd.write_string(s)
-            self.prevStr = s  # Save so we can test if screen changed between calls, don't update if not needed to reduce LCD flicker
+            #self.lcd.clear()
 
-    def big_time_view(self):
-        """Shows custom large local time on LCD"""
+            text_length = len(text)
+            if text_length < self._lcd_width:
+                blank_space = self._lcd_width - text_length
+                if align == 'LEFT':
+                    text = text + b' ' * blank_space
+                elif align == 'RIGHT':
+                    text = b' ' * blank_space + text
+                else:
+                    text = b' ' * (blank_space // 2) + text + b' ' * (blank_space - blank_space // 2)
+            else:
+                text = text[:self._lcd_width]
 
-        now = time.localtime()
-        hrs = int(time.strftime("%H"))
-        minutes = int(time.strftime("%M"))
-        sec = int(time.strftime("%S"))
+            self.lcd.cursor_pos = (line, 0)
 
-        # Build string representing top and bottom rows
-        L1 = "0" + str(digits[hrs][0]).zfill(5) + str(digits[minutes][0]).zfill(5) + str(digits[sec][0]).zfill(5)
-        L2 = "0" + str(digits[hrs][1]).zfill(5) + str(digits[minutes][1]).zfill(5) + str(digits[sec][1]).zfill(5)
+            self.lcd.write_string(text.decode('utf-8'))
+            self.prevStr = text  # Save so we can test if screen changed between calls, don't update if not needed to reduce LCD flicker
 
-        # Convert strings from digits into pointers to custom character
-        i = 0
-        XL1 = ""
-        XL2 = ""
-        while i < len(L1):
-            XL1 = XL1 + chr(int(L1[i]))
-            XL2 = XL2 + chr(int(L2[i]))
-            i += 1
-        self.write_lcd(XL1 + "\r" + XL2)
-        # return XL1 + "\r" + XL2
+
 
     def precision_view(self):
         """Calculate and display the NTPD accuracy"""
@@ -124,7 +146,7 @@ class LCDScreen(object):
             theStr += "ClkJit: {:>4} ms".format(clk_jitter)
         else:
             theStr = "Error: No\rPrecision data"
-        self.write_lcd(theStr)
+        self.print_line(theStr)
         # return theStr
 
     def ntptime_info(self):
@@ -141,7 +163,7 @@ class LCDScreen(object):
             theStr += "Stabi: {:>9}".format(precision.group(2))
         else:
             theStr = "No info\nError"
-        self.write_lcd(theStr)
+        self.print_line(theStr)
 
     def clockperf_view(self):
         """Shows jitter etc"""
@@ -152,7 +174,7 @@ class LCDScreen(object):
             theStr += "OSjitt: {:>8}".format(search.group(2))
         else:
             theStr = "No offset\rinfo error"
-        self.write_lcd(theStr)
+        self.print_line(theStr)
 
     def connectedUserView(self):
         """Shows connected clients to ntpd"""
@@ -176,22 +198,22 @@ class LCDScreen(object):
 
         theStr = "Con users: {:>6}".format(output.decode('utf-8'))
         theStr += "Hi cons: {:>8}".format(highestCount)
-        self.write_lcd(theStr)
+        self.print_line(theStr)
 
     def get_hostname(self):
         import socket
         hostname = socket.getfqdn()
         if hostname:
-            self.write_lcd(hostname)
+            self.print_line(hostname)
         else:
-            self.write_lcd('No hostname')
+            self.print_line('No hostname')
 
     def get_current_ip(self):
         import socket
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(('1.1.1.1', 1))  # connect() for UDP doesn't send packets
         local_ip_address = s.getsockname()[0]
-        self.write_lcd(local_ip_address)
+        self.print_line(local_ip_address)
 
     def update_lcd(self):
         if time.time() - self.lastScreenTime > self.screens[self.currentScreen][1]:  # Time to switch display
