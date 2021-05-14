@@ -244,8 +244,19 @@ class Screens(object):
         psutil_sensors_temperature = psutil.sensors_temperatures()
         current_cpu_temp = psutil_sensors_temperature.get('cpu_thermal')[0].current
 
+        hight_cpu_temp = psutil_sensors_temperature.get('cpu_thermal')[0].high
+        critical_cpu_temp = psutil_sensors_temperature.get('cpu_thermal')[0].critical
+
+        state_cpu_temp = None
+        if hight_cpu_temp:
+            state_cpu_temp = 'H'
+        elif critical_cpu_temp:
+            state_cpu_temp = 'C'
+
         l1 = "CPU: {:.1f}{}C".format(current_cpu_temp, chr(223))
         l2 = "GPU: {:.1f}{}C".format(gpu_temp.get('measure_temp'), chr(223))
+        if state_cpu_temp:
+            l2 = l2 + " " + state_cpu_temp
         return (l1, 0), (l2, 1)
 
     #@register_screen(order=6)
