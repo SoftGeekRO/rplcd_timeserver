@@ -272,6 +272,13 @@ class Screens(object):
 
     @register_screen(order=8)
     def chrony_root_delay(self):
+        """This is the total of the network path delays to the stratum-1 computer from which the computer is ultimately
+        synchronised. In certain extreme situations, this value can be negative.
+        (This can arise in a symmetric peer arrangement where the computers’ frequencies are not tracking each other
+        and the network delay is very short relative to the turn-around time at each computer.)
+
+        :return:
+        """
         stderr, chrony = self.chrony.chrony_tracking()
 
         reference_name = chrony.get('reference_name')
@@ -288,6 +295,12 @@ class Screens(object):
 
     @register_screen(order=9)
     def chrony_root_dispersion(self):
+        """This is the total dispersion accumulated through all the computers back to the stratum-1 computer from
+        which the computer is ultimately synchronised. Dispersion is due to system clock resolution,
+        statistical measurement variations etc.
+
+        :return:
+        """
         stderr, chrony = self.chrony.chrony_tracking()
 
         reference_name = chrony.get('reference_name')
@@ -305,6 +318,10 @@ class Screens(object):
 
     @register_screen(order=10)
     def chrony_last_offset(self):
+        """This is the estimated local offset on the last clock update.
+
+        :return:
+        """
         stderr, chrony = self.chrony.chrony_tracking()
 
         reference_name = chrony.get('reference_name')
@@ -313,11 +330,16 @@ class Screens(object):
         last_off = normalize_timespec(float(last_offset))
 
         l1 = '{} Last offset'.format(reference_name)
-        l2 = '{last_off} {last_off_unit}'.format(last_off=int(last_off[0]), last_off_unit=last_off[1])
+        l2 = '{last_off} {last_off_unit}'.format(last_off=int(last_off[0]),
+                                                 last_off_unit=chr(228)+"s" if last_off[1] == 'µs' else last_off[1])
         return (l1, 0), (l2, 1)
 
     @register_screen(order=11)
     def chrony_rms_offset(self):
+        """This is a long-term average of the offset value.
+
+        :return:
+        """
         stderr, chrony = self.chrony.chrony_tracking()
 
         reference_name = chrony.get('reference_name')
@@ -331,6 +353,17 @@ class Screens(object):
 
     @register_screen(order=12)
     def chrony_system_time(self):
+        """In normal operation, chronyd never steps the system clock, because any jump in the timescale can have
+        adverse consequences for certain application programs. Instead, any error in the system clock is corrected by
+        slightly speeding up or slowing down the system clock until the error has been removed,
+        and then returning to the system clock’s normal speed.
+        A consequence of this is that there will be a period when the system clock
+        (as read by other programs using the gettimeofday() system call, or by the date command in the shell)
+        will be different from chronyd's estimate of the current true time (which it reports to NTP clients when it is
+        operating in server mode). The value reported on this line is the difference due to this effect.
+
+        :return:
+        """
         stderr, chrony = self.chrony.chrony_tracking()
 
         reference_name = chrony.get('reference_name')
@@ -345,6 +378,13 @@ class Screens(object):
 
     @register_screen(order=13)
     def chrony_frequency(self):
+        """The ‘frequency’ is the rate by which the system’s clock would be would be wrong if chronyd was not
+        correcting it. It is expressed in ppm (parts per million). For example, a value of 1ppm would mean that when
+        the system’s clock thinks it has advanced 1 second, it has actually advanced by 1.000001 seconds relative to
+        true time.
+
+        :return:
+        """
         stderr, chrony = self.chrony.chrony_tracking()
 
         reference_name = chrony.get('reference_name')
@@ -357,6 +397,17 @@ class Screens(object):
 
     @register_screen(order=14)
     def chrony_residual_freq(self):
+        """This shows the ‘residual frequency’ for the currently selected reference source.
+        This reflects any difference between what the measurements from the reference source indicate the frequency
+        should be and the frequency currently being used. The reason this is not always zero is that a smoothing
+        procedure is applied to the frequency. Each time a measurement from the reference source is obtained and a new
+        residual frequency computed, the estimated accuracy of this residual is compared with the estimated accuracy
+        (see ‘skew’ next) of the existing frequency value. A weighted average is computed for the new frequency,
+        with weights depending on these accuracies. If the measurements from the reference source follow a consistent
+        trend, the residual will be driven to zero over time.
+
+        :return:
+        """
         stderr, chrony = self.chrony.chrony_tracking()
 
         reference_name = chrony.get('reference_name')
@@ -369,6 +420,10 @@ class Screens(object):
 
     @register_screen(order=15)
     def chrony_skew(self):
+        """This is the estimated error bound on the frequency.
+
+        :return:
+        """
         stderr, chrony = self.chrony.chrony_tracking()
 
         reference_name = chrony.get('reference_name')

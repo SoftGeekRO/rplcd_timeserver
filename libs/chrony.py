@@ -67,30 +67,13 @@ class ChronyParser(object):
             clock_offset = normalize_timespec(clock_offset_from_ntp)
 
             if abs(clock_offset_from_ntp) >= self.maximum_divergence_tolerated:
-                clock_status = '{co}[max{mt}s]slow'.format(
+                clock_status = '{co}[max{mt}s] NOK'.format(
                     co=int(clock_offset_from_ntp), mt=int(self.maximum_divergence_tolerated))
             else:
-                clock_status = '{co}{co_unit}[{mt}s]'.format(
+                clock_status = '{co}{co_unit}[{mt}s] OK'.format(
                     co=int(clock_offset[0]), co_unit=clock_offset[1], mt=int(self.maximum_divergence_tolerated))
             indata['clock_status'] = clock_status
         else:
             stderr = b'Unexpected error on Chrony tracking'
 
-
-        #
-        # for line in rows:
-        #     stats = line.split(':')
-        #     if len(stats) < 2:
-        #         return "unexpected output from chronyc, expected ':' in %s".format(data), indata
-        #     name = stats[0].strip().replace(" ", "_").lower()
-        #     print(name)
-        #     if 'ref_time' in name:
-        #         continue
-        #
-        #     value_fields = stats[1].strip().split(" ")
-        #
-        #     if "slow" in stats[1]:
-        #         value_fields[0] = "-{0}".format(value_fields[0])
-        #
-        #     indata[name] = value_fields[0]
         return stderr.decode('UTF-8'), indata
