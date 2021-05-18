@@ -373,7 +373,7 @@ class Screens(object):
         st = normalize_timespec(float(system_time))
 
         l1 = '{0} SysTime'.format(reference_name)
-        l2 = '{0}{1} {2}'.format(int(st[0]), st[1], "fast" if st[0] > 1 else "slow")
+        l2 = '{0}{1} {2}'.format(int(st[0]), chr(228)+"s" if st[1] == 'µs' else st[1], "fast" if st[0] > 1 else "slow")
 
         return (l1, 0), (l2, 1)
 
