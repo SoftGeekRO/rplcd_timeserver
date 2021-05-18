@@ -15,7 +15,7 @@
 
 import re
 
-from tools import SubprocessShell
+from tools import SubprocessShell, normalize_timespec
 
 
 class ChronyParser(object):
@@ -24,6 +24,25 @@ class ChronyParser(object):
 
     chronyc_path = '/usr/bin/chronyc'
 
+    maximum_divergence_tolerated = float(1)
+
+    tracking_fields = [
+        'reference_id',
+        'reference_name',
+        'stratum',
+        'ref_time_(utc)',
+        'system_time',
+        'last_offset',
+        'rms_offset',
+        'frequency',
+        'residual_freq',
+        'skew',
+        'root_delay',
+        'root_dispersion',
+        'update_interval',
+        'leap_status',
+    ]
+
     def __init__(self):
         pass
 
@@ -31,25 +50,47 @@ class ChronyParser(object):
 
         indata = {}
 
-        stderr, stdout = self.shell.shell_run(self.chronyc_path + ' tracking')
+        stderr, stdout = self.shell.shell_run(self.chronyc_path + ' -c tracking')
 
         data = stdout.decode('utf-8')
 
-        rows = data.strip().split('\n')
+        data_raw = data.strip()
 
-        for line in rows:
-            stats = line.split(':')
-            if len(stats) < 2:
-                return "unexpected output from chronyc, expected ':' in %s".format(data), indata
-            name = stats[0].strip().replace(" ", "_").lower()
+        clock_data = data_raw.split(',')
 
-            if 'ref_time' in name:
-                continue
+        if len(self.tracking_fields) == len(clock_data):
+            for ndx, clock in enumerate(clock_data):
+                indata[self.tracking_fields[ndx]] = clock
 
-            value_fields = stats[1].strip().split(" ")
+            clock_offset_from_ntp = float(clock_data[4])
 
-            if "slow" in stats[1]:
-                value_fields[0] = "-{0}".format(value_fields[0])
+            clock_offset = normalize_timespec(clock_offset_from_ntp)
 
-            indata[name] = value_fields[0]
+            if abs(clock_offset_from_ntp) >= self.maximum_divergence_tolerated:
+                clock_status = '{co}[max{mt}s]slow'.format(
+                    co=int(clock_offset_from_ntp), mt=int(self.maximum_divergence_tolerated))
+            else:
+                clock_status = '{co}{co_unit}[{mt}s]'.format(
+                    co=int(clock_offset[0]), co_unit=clock_offset[1], mt=int(self.maximum_divergence_tolerated))
+            indata['clock_status'] = clock_status
+        else:
+            stderr = b'Unexpected error on Chrony tracking'
+
+
+        #
+        # for line in rows:
+        #     stats = line.split(':')
+        #     if len(stats) < 2:
+        #         return "unexpected output from chronyc, expected ':' in %s".format(data), indata
+        #     name = stats[0].strip().replace(" ", "_").lower()
+        #     print(name)
+        #     if 'ref_time' in name:
+        #         continue
+        #
+        #     value_fields = stats[1].strip().split(" ")
+        #
+        #     if "slow" in stats[1]:
+        #         value_fields[0] = "-{0}".format(value_fields[0])
+        #
+        #     indata[name] = value_fields[0]
         return stderr.decode('UTF-8'), indata

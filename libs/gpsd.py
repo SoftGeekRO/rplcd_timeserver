@@ -23,7 +23,9 @@ logger = logging.getLogger(__name__)
 
 
 class NoFixError(Exception):
-    pass
+
+    def __init__(self, reason):
+        self.reason = reason
 
 
 class Gpsd(object):

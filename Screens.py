@@ -26,7 +26,7 @@ from libs.ntpq import NtpqParser
 from libs.chrony import ChronyParser
 from libs.gpsd import Gpsd, NoFixError
 
-from tools import humanize_file_size
+from tools import humanize_file_size, normalize_timespec
 from decorators import class_register_screen, register_screen
 
 # Define digit pairs from 00 to 61 (yes 61 because of leap seconds)
@@ -74,11 +74,8 @@ class Screens(object):
         self.lcd_screen = LCDScreen("Atomic Clock NTP")
 
         self.vcgencmd = VcgencmdParser()
-
         self.gpsd = Gpsd()
-
         self.chrony = ChronyParser()
-
         self.ntpq = NtpqParser()
 
         self.screens_iter = cycle(self.methods_ordered)
@@ -145,13 +142,16 @@ class Screens(object):
 
         current_screen = self.process_screen()
         self.screen_method = current_screen[0].split('.')[1]
+        #self.screen_option_time = current_screen[1].get('screen_time')
 
     def display_screen(self):
         # execute the screen method
         line0, line1 = getattr(self, self.screen_method)()
 
-        self.lcd_screen.print_line(line0[0], line0[1], align='CENTER')
-        self.lcd_screen.print_line(line1[0], line1[1], align='CENTER')
+        line0_align = 'CENTER' if len(line0) == 2 else line0[2]
+
+        self.lcd_screen.print_line(line0[0], line0[1], align=line0_align)
+        self.lcd_screen.print_line(line1[0], line1[1], align=line0_align)
 
     def loop_screens(self):
         if self.current_timer_cycle_delay >= self.screen_option_time:
@@ -214,8 +214,8 @@ class Screens(object):
     def psutil_cpu_freq(self):
         cpu_freq = psutil.cpu_freq()
 
-        l1 = "Now:{:d} Mhz".format(int(cpu_freq.current))
-        l2 = "Min:{:d} Max:{:d}".format(int(cpu_freq.min), int(cpu_freq.max))
+        l1 = "CPU Frequency".format()
+        l2 = "{:d}[{:d}]Mhz".format(int(cpu_freq.current), int(cpu_freq.max))
 
         return (l1, 0), (l2, 1)
 
@@ -223,12 +223,12 @@ class Screens(object):
     def psutil_cpu_load(self):
         cpu_load = psutil.getloadavg()
 
-        l1 = "1:{0}".format(cpu_load[0])
-        l2 = "5:{0} 15:{1}".format(cpu_load[1], cpu_load[2])
+        l1 = "CPU Load".format(cpu_load[0])
+        l2 = "{0}/{1}/{2}".format(cpu_load[0], cpu_load[1], cpu_load[2])
 
         return (l1, 0), (l2, 1)
 
-    @register_screen(order=4)
+    @register_screen(order=5)
     def psutil_network_counters(self):
         net = psutil.net_io_counters(pernic=True)
         interface = net.get('eth0')
@@ -238,7 +238,7 @@ class Screens(object):
 
         return (l1, 0), (l2, 1)
 
-    @register_screen(order=5)
+    @register_screen(order=6)
     def vcgencmd_measure_temp(self):
         stderr, gpu_temp = self.vcgencmd.measure_temp()
         psutil_sensors_temperature = psutil.sensors_temperatures()
@@ -259,17 +259,127 @@ class Screens(object):
             l2 = l2 + " " + state_cpu_temp
         return (l1, 0), (l2, 1)
 
-    #@register_screen(order=6)
-    def chrony_stats(self):
-        chrony = self.chrony.chrony_tracking()
+    @register_screen(order=7)
+    def chrony_status(self):
+        stderr, chrony = self.chrony.chrony_tracking()
 
-        print(chrony)
+        reference_name = chrony.get('reference_name')
+        clock_status = chrony.get('clock_status')
 
-        l1 = ''
-        l2 = ''
+        l1 = '{reference_name}'.format(reference_name=reference_name)
+        l2 = '{clock_status}'.format(clock_status=clock_status)
         return (l1, 0), (l2, 1)
 
-    @register_screen(order=7)
+    @register_screen(order=8)
+    def chrony_root_delay(self):
+        stderr, chrony = self.chrony.chrony_tracking()
+
+        reference_name = chrony.get('reference_name')
+        root_delay = chrony.get('root_delay')
+        root_root_dispersion = chrony.get('root_dispersion')
+
+        _root_delay = normalize_timespec(float(root_delay))
+        _root_root_dispersion = normalize_timespec(float(root_root_dispersion))
+
+        l1 = '{} Root Delay'.format(reference_name)
+        l2 = '{root_delay} {root_delay_unit}'.format(root_delay=int(_root_delay[0]),
+                                                    root_delay_unit=_root_delay[1])
+        return (l1, 0, 'CENTER'), (l2, 1, 'CENTER')
+
+    @register_screen(order=9)
+    def chrony_root_dispersion(self):
+        stderr, chrony = self.chrony.chrony_tracking()
+
+        reference_name = chrony.get('reference_name')
+        root_delay = chrony.get('root_delay')
+        root_root_dispersion = chrony.get('root_dispersion')
+
+        _root_delay = normalize_timespec(float(root_delay))
+        _root_root_dispersion = normalize_timespec(float(root_root_dispersion))
+
+        l1 = '{} Root Disper'.format(reference_name)
+        l2 = '{root_root_dispersion} {root_root_dispersion_unit}'.format(
+            root_root_dispersion=int(_root_root_dispersion[0]),
+            root_root_dispersion_unit=chr(228)+"s" if _root_root_dispersion[1] == 'µs' else _root_root_dispersion[1])
+        return (l1, 0, 'CENTER'), (l2, 1, 'CENTER')
+
+    @register_screen(order=10)
+    def chrony_last_offset(self):
+        stderr, chrony = self.chrony.chrony_tracking()
+
+        reference_name = chrony.get('reference_name')
+        last_offset = chrony.get('last_offset', 0.0)
+
+        last_off = normalize_timespec(float(last_offset))
+
+        l1 = '{} Last offset'.format(reference_name)
+        l2 = '{last_off} {last_off_unit}'.format(last_off=int(last_off[0]), last_off_unit=last_off[1])
+        return (l1, 0), (l2, 1)
+
+    @register_screen(order=11)
+    def chrony_rms_offset(self):
+        stderr, chrony = self.chrony.chrony_tracking()
+
+        reference_name = chrony.get('reference_name')
+        rms_offset = chrony.get('rms_offset', 0.0)
+
+        rms_off = normalize_timespec(float(rms_offset))
+
+        l1 = '{} RMS offset'.format(reference_name)
+        l2 = '{rms_off} {rms_off_unit}'.format(rms_off=int(rms_off[0]), rms_off_unit=rms_off[1])
+        return (l1, 0), (l2, 1)
+
+    @register_screen(order=12)
+    def chrony_system_time(self):
+        stderr, chrony = self.chrony.chrony_tracking()
+
+        reference_name = chrony.get('reference_name')
+        system_time = chrony.get('system_time', 0.0)
+
+        st = normalize_timespec(float(system_time))
+
+        l1 = '{0} SysTime'.format(reference_name)
+        l2 = '{0}{1} {2}'.format(int(st[0]), st[1], "fast" if st[0] > 1 else "slow")
+
+        return (l1, 0), (l2, 1)
+
+    @register_screen(order=13)
+    def chrony_frequency(self):
+        stderr, chrony = self.chrony.chrony_tracking()
+
+        reference_name = chrony.get('reference_name')
+        frequency = chrony.get('frequency', 0.0)
+
+        l1 = '{0} Frequency'.format(reference_name)
+        l2 = '{0} ppm {1}'.format(frequency, "fast" if float(frequency) > 1 else "slow")
+
+        return (l1, 0), (l2, 1)
+
+    @register_screen(order=14)
+    def chrony_residual_freq(self):
+        stderr, chrony = self.chrony.chrony_tracking()
+
+        reference_name = chrony.get('reference_name')
+        residual_freq = chrony.get('residual_freq', 0.0)
+
+        l1 = '{0} Residual freq'.format(reference_name)
+        l2 = '{0} ppm'.format(residual_freq)
+
+        return (l1, 0), (l2, 1)
+
+    @register_screen(order=15)
+    def chrony_skew(self):
+        stderr, chrony = self.chrony.chrony_tracking()
+
+        reference_name = chrony.get('reference_name')
+        skew = chrony.get('skew', 0.0)
+
+        l1 = '{0} Skew'.format(reference_name)
+        l2 = '{0} ppm'.format(skew)
+
+        return (l1, 0), (l2, 1)
+
+    @register_screen(order=16)
     def gpsd_stats(self):
         stats = self.gpsd.get_current()
         mode = stats.get_mode()

@@ -35,8 +35,8 @@ class VcgencmdParser(object):
         stderr, stdout = self.shell.shell_run(self.vcgencmd_bin + ' measure_temp')
 
         data = stdout.decode('utf-8')
-
         measure_temp = re.search(r'-?\d+\.?\d*', data)
+
         indata.update({'measure_temp': float(measure_temp.group())})
 
         return stderr.decode('UTF-8'), indata
