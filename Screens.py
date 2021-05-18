@@ -348,7 +348,8 @@ class Screens(object):
         rms_off = normalize_timespec(float(rms_offset))
 
         l1 = '{} RMS offset'.format(reference_name)
-        l2 = '{rms_off} {rms_off_unit}'.format(rms_off=int(rms_off[0]), rms_off_unit=rms_off[1])
+        l2 = '{rms_off} {rms_off_unit}'.format(rms_off=int(rms_off[0]),
+                                               rms_off_unit=chr(228)+"s" if rms_off[1] == 'µs' else rms_off[1])
         return (l1, 0), (l2, 1)
 
     @register_screen(order=12)
