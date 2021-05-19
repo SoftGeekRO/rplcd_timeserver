@@ -26,7 +26,7 @@ from libs.ntpq import NtpqParser
 from libs.chrony import ChronyParser
 from libs.gpsd import Gpsd, NoFixError
 
-from tools import humanize_file_size, normalize_timespec
+from tools import humanize_file_size, normalize_timespec, human_time
 from decorators import class_register_screen, register_screen
 
 # Define digit pairs from 00 to 61 (yes 61 because of leap seconds)
@@ -443,5 +443,17 @@ class Screens(object):
         l1 = "{} {}[{}]".format(mode, stats.sats, stats.sats_valid)
         l2 = 'H:{:.2f} P:{:.2f}'.format(stats.hdop, stats.pdop)
         return (l1, 0), (l2, 1)
+
+    @register_screen(order=17)
+    def psutil_boot_time(self):
+        boot_time = psutil.boot_time()
+        datetime_boot_time = datetime.datetime.fromtimestamp(boot_time)
+
+        boot_time_delta = datetime.datetime.now() - datetime_boot_time
+
+        l1 = "Boot since".format()
+        l2 = '{}'.format(human_time(second=int(boot_time_delta.seconds)))
+        return (l1, 0), (l2, 1)
+
 
 

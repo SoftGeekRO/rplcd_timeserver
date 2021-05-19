@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 import math
-import asyncio
+import datetime
 import subprocess
 from typing import Tuple
 
@@ -124,6 +124,21 @@ def make_nice(value: float, unit: str = 's'):
         value /= 1000
         unit = next(prefixes) + unit[-1]
     return f'{value:g}{unit}'
+
+
+def human_time(*args, **kwargs):
+    secs = float(datetime.timedelta(*args, **kwargs).total_seconds())
+    units = [("D", 86400), ("H", 3600), ("min.e", 60), ("sec.", 1)]
+    parts = []
+    for unit, mul in units:
+        if secs / mul >= 1 or mul == 1:
+            if mul > 1:
+                n = int(math.floor(secs / mul))
+                secs -= n * mul
+            else:
+                n = secs if secs != int(secs) else int(secs)
+            parts.append("%s %s%s" % (n, unit, "" if n == 1 else "s"))
+    return ",".join(parts)
 
 
 class SubprocessShell(object):
