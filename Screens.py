@@ -452,7 +452,7 @@ class Screens(object):
         boot_time_delta = datetime.datetime.now() - datetime_boot_time
 
         l1 = "Boot since".format()
-        l2 = '{}'.format(human_time(second=int(boot_time_delta.seconds)))
+        l2 = '{}'.format(human_time(seconds=int(boot_time_delta.seconds)))
         return (l1, 0), (l2, 1)
 
 
