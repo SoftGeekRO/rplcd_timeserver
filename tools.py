@@ -138,7 +138,7 @@ def human_time(*args, **kwargs):
             else:
                 n = secs if secs != int(secs) else int(secs)
             parts.append("%s%s%s" % (n, unit, "" if n == 1 else "s"))
-    return ", ".join(parts)
+    return ",".join(parts)
 
 
 class SubprocessShell(object):
