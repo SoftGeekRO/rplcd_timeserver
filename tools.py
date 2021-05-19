@@ -128,7 +128,7 @@ def make_nice(value: float, unit: str = 's'):
 
 def human_time(*args, **kwargs):
     secs = float(datetime.timedelta(*args, **kwargs).total_seconds())
-    units = [("D", 86400), ("H", 3600), ("min", 60), ("", 1)]
+    units = [("D", 86400), ("H", 3600), ("min", 60), ("s", 1)]
     parts = []
     for unit, mul in units:
         if secs / mul >= 1 or mul == 1:
@@ -137,7 +137,7 @@ def human_time(*args, **kwargs):
                 secs -= n * mul
             else:
                 n = secs if secs != int(secs) else int(secs)
-            parts.append("%s%s%s" % (n, unit, "" if n == 1 else "s"))
+            parts.append("%s%s" % (n, unit))
     return ",".join(parts)
 
 
